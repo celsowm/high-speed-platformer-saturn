@@ -134,6 +134,29 @@ int main() {
         OK(g.hero.layer == 0);
     }
 
+    /* --- the same loop from its right side: enter on layer 1, over the top, out on the left --- */
+    place(1560, 320, -14.0, true);
+    {
+        const uint32_t switches = g.stats.layer_switches;
+        const uint32_t deaths = g.stats.deaths;
+        double min_y = 1e9;
+        double min_x = 1e9;
+        for (unsigned i = 0; i < 120; ++i) {
+            hsp_game_step(&g, SAT_PAD_LEFT, 0);
+            if (px(g.hero.position.y) < min_y) min_y = px(g.hero.position.y);
+            if (px(g.hero.position.x) < min_x) min_x = px(g.hero.position.x);
+            if (trace && i % 4 == 0) report("loop<-");
+        }
+        std::printf("loop<-: min_y=%.1f x=%.1f layer=%d switches=%u deaths=%u\n", min_y, px(g.hero.position.x),
+                    g.hero.layer, g.stats.layer_switches - switches, g.stats.deaths - deaths);
+        OK(g.stats.deaths == deaths);
+        OK(g.stats.layer_switches - switches >= 2);
+        OK(min_y < 220.0);
+        /* out on the left, where the dash pad before the ring sends the hero back */
+        OK(min_x < 1180.0);
+        OK(g.hero.layer == 0);
+    }
+
     /* --- the rail: grab it in the air, ride the Bezier, drop off at its end --- */
     place(1860, 270, 8.0, false);
     {

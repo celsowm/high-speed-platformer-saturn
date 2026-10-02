@@ -471,9 +471,12 @@ def write_layout(out, g, pit1, pit2, profile_count, first_decor):
     top = (G - 16) * TILE
     triggers = [
         # x, y, w, h, layer, dir (1 right, -1 left, 0 either)
-        (x0 - 64, (G - 8) * TILE, 16, 8 * TILE, 0, 0),      # before the ring: layer 0
+        (x0 - 64, (G - 8) * TILE, 16, 8 * TILE, 0, 0),      # before the ring (either way): layer 0
         (x0 + 7 * TILE, top, 3 * TILE, 5 * TILE, 1, -1),     # on the ceiling, heading left: layer 1
-        (x0 + 24 * TILE, (G - 8) * TILE, 16, 8 * TILE, 0, 0),  # after the ring: back to layer 0
+        (x0 + 24 * TILE, (G - 8) * TILE, 16, 8 * TILE, 0, 1),  # leaving to the right: back to layer 0
+        # the same ring run from the right: enter on layer 1 (the left half), come down the right half
+        (x0 + 24 * TILE, (G - 8) * TILE, 16, 8 * TILE, 1, -1),  # entering from the right: layer 1
+        (x0 + 7 * TILE, top, 3 * TILE, 5 * TILE, 0, 1),      # on the ceiling, heading right: layer 0
     ]
     platforms = [
         # kind 0: follows the `swing` Bezier, back and forth; kind 1: rides a circle
