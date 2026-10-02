@@ -17,8 +17,8 @@
 #include "saturn/sprite_clip.h"
 #include "saturn/terrain2.h"
 
-#include "high_speed_platformer/layout.h"
-#include "high_speed_platformer/stage.h"
+#include "layout.h"
+#include "stage.h"
 
 #ifdef __cplusplus
 extern "C" {

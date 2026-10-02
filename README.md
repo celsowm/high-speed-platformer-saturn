@@ -1,9 +1,12 @@
 # high_speed_platformer
 
-A stage-based 2D platformer built from the generic 2D runtime modules of libsaturn, and nothing
-else: no module in the library knows this game. It is the acceptance example of
-`docs/SONIC_CLASS_2D_RUNTIME_REFACTOR_PLAN.md` and is written to be moved into its own repository
-(see "Boundary" below).
+A stage-based 2D platformer built from the generic 2D runtime modules of
+[LibSaturn](https://github.com/celsowm/libsaturn), and nothing else: no module in the library knows
+this game. It was the acceptance example of LibSaturn's 2D runtime refactor and lives here as an
+independent consumer of the installed LibSaturn package: it reaches the library only through
+`find_package(LibSaturn CONFIG)`, `LibSaturn::Saturn`, `LibSaturn::Sim2D` and the helpers the package
+ships. There is no sibling checkout, no `add_subdirectory`, and no LibSaturn private header or
+build-tree path anywhere in this repository.
 
 Everything in it is original or synthetic: the stage is placed by code, the art is drawn by code,
 and no data comes from any other game.
@@ -40,43 +43,66 @@ last checkpoint flag.
 
 ## Layout
 
-| File | What it is |
+| Path | What it is |
 | --- | --- |
-| `game.c`, `game.h` | the game: acceleration, slopes, jumps, rail, pickups, camera and entity glue. No hardware. |
-| `view.c`, `view.h` | VDP2 layers, texture, VDP1 draws and the HUD |
-| `art.c`, `art.h` | procedural cells, palettes and the sprite sheet |
-| `main.c` | the frame loop (60 Hz fixed steps, up to three catch-up steps per frame) |
+| `src/game.c`, `src/game.h` | the game: acceleration, slopes, jumps, rail, pickups, camera and entity glue. No hardware. |
+| `src/view.c`, `src/view.h` | VDP2 layers, texture, VDP1 draws and the HUD |
+| `src/art.c`, `src/art.h` | procedural cells, palettes and the sprite sheet |
+| `src/main.c` | the frame loop (60 Hz fixed steps, up to three catch-up steps) |
 | `tools/gen_stage.py` | writes the stage2d spec and the layout (spawn, triggers, platforms) |
-| `Makefile.inc`, `stage.mk`, `host_test.mk` | build rules |
+| `cmake/StageData.cmake` | runs `gen_stage.py`, then LibSaturn's installed `stage2d_tool.py`, into the build tree |
+| `tests/host/test_sim.cpp` | plays the game's `game.c` with no video chip and asserts the stress items |
+| `tests/host/test_boundary.cpp` | the consumer-boundary check against the installed prefix |
 | `harness/high_speed_platformer.pad`, `tools/probe_check.py` | the scripted probe run and its check |
 
-`gen_stage.py` and `tools/stage2d_tool.py` produce `stage.h/.c` and `layout.h/.c` into
-`build/generated/high_speed_platformer/`; nothing generated is checked in.
+`gen_stage.py` and `stage2d_tool.py` produce `stage.h/.c` and `layout.h/.c` into
+`build/<preset>/generated/`; nothing generated is checked in.
 
-## Build and run
+## Requirements
 
+- An installed LibSaturn package (a `cmake --install` prefix, or the Conan package), version 0.1 or
+  newer: it provides the runtime, the stage2d tool and `LibSaturn::Sim2D`. Set `LIBSATURN_PREFIX` to it.
+- The `sh2eb-elf` GCC toolchain on `PATH`, CMake 3.24+, Ninja, Python 3.9+ (standard library only, see
+  `requirements.txt`), and `mkisofs`/`genisoimage`/`xorrisofs` for the disc image.
+
+## Build and test
+
+```sh
+export LIBSATURN_PREFIX=/path/to/libsaturn   # the installed package
+
+cmake --preset host                          # simulation + boundary tests (native compiler)
+cmake --build --preset host
+ctest --preset host
+
+cmake --preset saturn                        # firmware and the bootable disc (SH-2 cross build)
+cmake --build --preset saturn
 ```
-.\build-example.ps1 -Example high_speed_platformer
-.\run-example.ps1  -Example high_speed_platformer
+
+Outputs under `build/saturn/`: `high_speed_platformer.elf`, `high_speed_platformer.app.bin` (must stay
+under 983040 bytes) and `disc/high_speed_platformer.{iso,bin,cue}`.
+
+With Conan instead of a CMake prefix:
+
+```sh
+conan config install <libsaturn>/packaging/conan/config
+conan create <libsaturn> --profile:host=saturn-sh2eb --profile:build=default
+conan create .           --profile:host=saturn-sh2eb --profile:build=default
 ```
 
-The simulation test plays the same `game.c` without a video chip and asserts the stress items:
+## Run it
 
-```
-make test        # runs tests/host/test_high_speed_platformer.cpp and ..._boundary.cpp
-```
+Open `build/saturn/disc/high_speed_platformer.cue` in an emulator. LibSaturn's Ymir harness probe (a
+separate tool, not vendored here) plays the whole stage with `harness/high_speed_platformer.pad` (run
+right, one short jump over the first pit). The game publishes counters in `g_hsp_telemetry`, and
+`tools/probe_check.py` reads them out of work RAM and fails unless the stage was cleared without a death,
+the loop switched layers twice and the speed passed the dash-pad speed:
 
-The Ymir probe plays the whole stage with `harness/high_speed_platformer.pad` (run right, one short
-jump over the first pit). The game publishes counters in `g_hsp_telemetry`, and
-`tools/probe_check.py` reads them out of work RAM and fails unless the stage was cleared without a
-death, the loop switched layers twice and the speed passed the dash-pad speed:
-
-```
-python examples/high_speed_platformer/tools/probe_check.py --shots build/hsp_shots
+```sh
+python tools/probe_check.py --probe path/to/probe --bios path/to/your_saturn_bios.bin     --nm sh2eb-elf-nm --shots build/shots
 ```
 
 ## Boundary
 
-The example includes public `saturn/*` headers only, never `examples/common`, and defines its own
-check macro. `tests/host/test_high_speed_platformer_boundary.cpp` fails the build on a private
-include, a reference to another example, or a missing file the extraction needs.
+The game includes public `saturn/*` headers only and defines its own check macro. The `boundary` test
+fails the build on a header the installed package does not ship, a private include, a build rule that
+adds a sibling directory, or a script that reaches into a LibSaturn checkout.

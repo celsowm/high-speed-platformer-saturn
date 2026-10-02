@@ -1,0 +1,2 @@
+# The stage generator (tools/gen_stage.py) and LibSaturn's stage2d tool use only the Python
+# standard library (3.9 or newer). Nothing to install; CMakeLists.txt checks the interpreter version.

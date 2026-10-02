@@ -2,8 +2,8 @@
 
 #include "saturn/color.h"
 
-#include "high_speed_platformer/layout.h"
-#include "high_speed_platformer/stage.h"
+#include "layout.h"
+#include "stage.h"
 
 /* ----- the cell sheet: one 8 x 8, 16-colour character per terrain profile ----- */
 

@@ -1,0 +1,16 @@
+# Build trees and generated data (the stage is produced at build time)
+/build/
+/build-*/
+/out/
+/CMakeUserPresets.json
+__pycache__/
+*.pyc
+*.o
+*.a
+*.elf
+*.map
+*.iso
+*.cue
+*.bin
+*.log
+*.tmp

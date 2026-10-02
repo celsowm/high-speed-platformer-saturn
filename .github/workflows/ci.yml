@@ -1,0 +1,57 @@
+name: CI
+
+# The high-speed platformer is an ordinary LibSaturn consumer. The job first obtains an *installed*
+# LibSaturn package (a prefix produced by `cmake --install`; see .github/actions/libsaturn-package)
+# and then builds this project against that prefix alone: the host simulation and boundary tests,
+# then the firmware and the bootable disc.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # LibSaturn release tag or commit whose installed package this project builds against. Bump
+  # together with LIBSATURN_MIN_VERSION in CMakeLists.txt.
+  LIBSATURN_REF: main
+
+jobs:
+  build:
+    name: Host tests and firmware disc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: libsaturn
+        uses: ./.github/actions/libsaturn-package
+        with:
+          ref: ${{ env.LIBSATURN_REF }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Host tests
+        env:
+          LIBSATURN_PREFIX: ${{ steps.libsaturn.outputs.prefix }}
+        run: |
+          cmake --preset host
+          cmake --build --preset host
+          ctest --preset host
+
+      - name: Firmware and disc
+        env:
+          LIBSATURN_PREFIX: ${{ steps.libsaturn.outputs.prefix }}
+        run: |
+          cmake --preset saturn
+          cmake --build --preset saturn
+          test -f build/saturn/disc/high_speed_platformer.cue
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: high-speed-platformer-disc
+          path: |
+            build/saturn/high_speed_platformer.app.bin
+            build/saturn/disc/high_speed_platformer.cue
+            build/saturn/disc/high_speed_platformer.bin

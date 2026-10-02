@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Plays the high_speed_platformer stage in the Ymir harness probe and checks the result.
 
-    python examples/high_speed_platformer/tools/probe_check.py [--shots DIR]
+    python tools/probe_check.py --probe PROBE --bios BIOS [--shots DIR]
 
-The pad script (harness/high_speed_platformer.pad) runs right with one short jump over the first pit.
+PROBE is LibSaturn's Ymir harness probe (a separate tool, not vendored here; or $LIBSATURN_PROBE) and BIOS
+a Saturn BIOS dump of your own (or $LIBSATURN_BIOS). The pad script (harness/high_speed_platformer.pad) runs right with one short jump over the first pit.
 The game publishes its counters in `g_hsp_telemetry` (main.c); after the run this reads them out of
 work RAM and fails unless the stage was cleared without a death, the loop switched layers twice, and
 the speed passed the dash-pad speed. With --shots it also writes screenshots of the run.
 
-Build first with `.\\build-example.ps1 -Example high_speed_platformer`. The pad script's frame numbers
+Build first with `cmake --preset saturn && cmake --build --preset saturn`. The pad script's frame numbers
 count emulated frames; the game starts its first tick about eight frames in (loading), which is why
 the jump is at frame 118 for tick 110 of the host simulation.
 """
@@ -16,6 +17,7 @@ the jump is at frame 118 for tick 110 of the host simulation.
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import struct
 import subprocess
@@ -24,8 +26,7 @@ import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-EXAMPLE = HERE.parent
-REPO = EXAMPLE.parents[1]
+ROOT = HERE.parent
 MAGIC = 0x48535031
 FIELDS = ("magic frames ticks x y rings deaths layer_switches platform_ticks rail_grabs landings spawned "
           "despawned top_speed cleared").split()
@@ -44,21 +45,23 @@ def find_symbol(nm: str, elf: Path, name: str) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--probe", default=str(REPO / "harness/build/probe.exe"))
-    ap.add_argument("--bios", default=str(REPO / "bios/saturn_bios_us.bin"))
-    ap.add_argument("--build", default=str(REPO / "build/examples"), help="directory with high_speed_platformer.*")
+    ap.add_argument("--probe", default=os.environ.get("LIBSATURN_PROBE"), help="the Ymir harness probe executable")
+    ap.add_argument("--bios", default=os.environ.get("LIBSATURN_BIOS"), help="a Saturn BIOS dump")
+    ap.add_argument("--build", default=str(ROOT / "build/saturn"), help="the saturn preset's build directory")
     ap.add_argument("--nm", default=shutil.which("sh2eb-elf-nm") or "sh2eb-elf-nm")
-    ap.add_argument("--pad", default=str(EXAMPLE / "harness/high_speed_platformer.pad"))
+    ap.add_argument("--pad", default=str(ROOT / "harness/high_speed_platformer.pad"))
     ap.add_argument("--frames", type=int, default=420)
     ap.add_argument("--shots", help="directory for screenshots at a few frames")
     args = ap.parse_args()
+    if not args.probe or not args.bios:
+        ap.error("--probe and --bios are required (or set LIBSATURN_PROBE and LIBSATURN_BIOS)")
 
     build = Path(args.build)
     elf = build / "high_speed_platformer.elf"
     address = find_symbol(args.nm, elf, "g_hsp_telemetry")
     with tempfile.TemporaryDirectory() as tmp:
         dump = Path(tmp) / "wram.bin"
-        cmd = [args.probe, "--iso", str(build / "high_speed_platformer.iso"), "--bios", args.bios,
+        cmd = [args.probe, "--iso", str(build / "disc" / "high_speed_platformer.iso"), "--bios", args.bios,
                "--bin", str(build / "high_speed_platformer.app.bin"), "--frames", str(args.frames),
                "--boot-frames", "90", "--pad-script", args.pad, "--dump-wram-high", str(dump)]
         if args.shots:
